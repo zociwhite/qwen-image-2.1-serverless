@@ -1,0 +1,7 @@
+runpod>=1.4.0
+diffusers @ git+https://github.com/huggingface/diffusers.git
+transformers>=5.17
+accelerate
+pillow
+requests
+hf_transfer
