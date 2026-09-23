@@ -41,10 +41,9 @@ def _load_pipe():
             torch_dtype=torch.bfloat16,
             cache_dir="/app/cache",
         )
-        if os.environ.get("MODEL_OFFLOAD") == "1":
-            pipe.enable_model_cpu_offload()
-        else:
-            pipe = pipe.to("cuda")
+
+        # Sub-module CPU offload: keeps VRAM usage ~15GB, freeing VRAM for VAE decode
+        pipe.enable_model_cpu_offload()
 
         # Enable VAE tiling & slicing to save VRAM during decode
         if hasattr(pipe, "enable_vae_tiling"):
