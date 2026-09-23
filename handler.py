@@ -38,8 +38,15 @@ def _load_pipe():
             cache_dir="/app/cache",
         )
 
-        # Sub-module CPU offload keeps VRAM ~15GB, preventing CUDA OOM
-        pipe.enable_model_cpu_offload()
+        # Offload or GPU move with safety fallback
+        try:
+            pipe.enable_model_cpu_offload()
+        except Exception as e:
+            print(f"enable_model_cpu_offload failed ({e}), falling back to pipe.to('cuda')")
+            try:
+                pipe.to("cuda")
+            except Exception as e2:
+                print(f"pipe.to('cuda') fallback error: {e2}")
 
         # Enable VAE tiling & slicing to prevent OOM during VAE decode
         if hasattr(pipe, "enable_vae_tiling"):
