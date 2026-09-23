@@ -89,6 +89,8 @@ def handler(job):
         raise ValueError("'prompt' is required")
 
     pipe = _load_pipe()
+    if hasattr(pipe, "enable_model_cpu_offload"):
+        pipe.enable_model_cpu_offload()
     torch.cuda.empty_cache()
 
     images_raw = list(job_input.get("images") or [])
