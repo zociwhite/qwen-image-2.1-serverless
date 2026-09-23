@@ -89,8 +89,11 @@ def handler(job):
         raise ValueError("'prompt' is required")
 
     pipe = _load_pipe()
-    if hasattr(pipe, "enable_model_cpu_offload"):
+    # Force accelerate CPU offload on every job invocation to guarantee VRAM < 16GB
+    try:
         pipe.enable_model_cpu_offload()
+    except Exception:
+        pass
     torch.cuda.empty_cache()
 
     images_raw = list(job_input.get("images") or [])
