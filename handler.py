@@ -46,10 +46,11 @@ def _load_pipe():
         else:
             pipe = pipe.to("cuda")
 
-        # Fix cuDNN error: CUDNN_STATUS_INTERNAL_ERROR during VAE decode.
-        # VAE conv2d requires float32 precision on CUDA.
-        if hasattr(pipe, "vae") and pipe.vae is not None:
-            pipe.vae = pipe.vae.to(device="cuda", dtype=torch.float32)
+        # Enable VAE tiling & slicing to save VRAM during decode
+        if hasattr(pipe, "enable_vae_tiling"):
+            pipe.enable_vae_tiling()
+        if hasattr(pipe, "enable_vae_slicing"):
+            pipe.enable_vae_slicing()
 
         _pipe = pipe
     return _pipe
@@ -89,6 +90,7 @@ def handler(job):
         raise ValueError("'prompt' is required")
 
     pipe = _load_pipe()
+    torch.cuda.empty_cache()
 
     images_raw = list(job_input.get("images") or [])
     if job_input.get("image"):
