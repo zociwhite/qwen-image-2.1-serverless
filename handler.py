@@ -1,23 +1,7 @@
-"""RunPod serverless worker for Qwen/Qwen-Image-2.1.
-
-Text-to-image (no images input) or image editing (1-10 reference images).
-Returns RAW base64 (no data: prefix) in {"image": "...", "format": "png"}.
-"""
-import base64
-import io
 import os
-import re
-import shutil
 
-import requests
-import runpod
-import torch
-from PIL import Image
-
-MODEL_ID = os.environ.get("QWEN_MODEL_ID", "Qwen/Qwen-Image-2.1")
-_MAX_IMAGES = 10
-
-# Force HF cache + tempfile into /app (150GB containerDisk-backed, NOT /workspace or /tmp).
+# Set environment variables BEFORE importing torch, transformers, diffusers, requests, or runpod
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 os.environ["HF_HOME"] = "/app/cache"
 os.environ["HF_HUB_CACHE"] = "/app/cache/huggingface/hub"
 os.environ["TRANSFORMERS_CACHE"] = "/app/cache/huggingface/transformers"
@@ -25,8 +9,20 @@ os.environ["DIFFUSERS_CACHE"] = "/app/cache/huggingface/diffusers"
 os.environ["XDG_CACHE_HOME"] = "/app/cache"
 os.environ["TMPDIR"] = "/app/tmp"
 os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
+
 os.makedirs("/app/cache", exist_ok=True)
 os.makedirs("/app/tmp", exist_ok=True)
+
+import base64
+import io
+import re
+import requests
+import runpod
+import torch
+from PIL import Image
+
+MODEL_ID = os.environ.get("QWEN_MODEL_ID", "Qwen/Qwen-Image-2.1")
+_MAX_IMAGES = 10
 
 _pipe = None
 
@@ -42,14 +38,19 @@ def _load_pipe():
             cache_dir="/app/cache",
         )
 
-        # Sub-module CPU offload: keeps VRAM usage ~15GB, freeing VRAM for VAE decode
+        # Sub-module CPU offload keeps VRAM ~15GB, preventing CUDA OOM
         pipe.enable_model_cpu_offload()
 
-        # Enable VAE tiling & slicing to save VRAM during decode
+        # Enable VAE tiling & slicing to prevent OOM during VAE decode
         if hasattr(pipe, "enable_vae_tiling"):
             pipe.enable_vae_tiling()
+        elif hasattr(pipe.vae, "enable_tiling"):
+            pipe.vae.enable_tiling()
+
         if hasattr(pipe, "enable_vae_slicing"):
             pipe.enable_vae_slicing()
+        elif hasattr(pipe.vae, "enable_slicing"):
+            pipe.vae.enable_slicing()
 
         _pipe = pipe
     return _pipe
@@ -89,11 +90,11 @@ def handler(job):
         raise ValueError("'prompt' is required")
 
     pipe = _load_pipe()
-    # Force accelerate CPU offload on every job invocation to guarantee VRAM < 16GB
     try:
         pipe.enable_model_cpu_offload()
     except Exception:
         pass
+
     torch.cuda.empty_cache()
 
     images_raw = list(job_input.get("images") or [])
