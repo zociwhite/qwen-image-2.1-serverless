@@ -45,6 +45,12 @@ def _load_pipe():
             pipe.enable_model_cpu_offload()
         else:
             pipe = pipe.to("cuda")
+
+        # Fix cuDNN error: CUDNN_STATUS_INTERNAL_ERROR during VAE decode.
+        # VAE conv2d requires float32 precision on CUDA.
+        if hasattr(pipe, "vae") and pipe.vae is not None:
+            pipe.vae = pipe.vae.to(device="cuda", dtype=torch.float32)
+
         _pipe = pipe
     return _pipe
 
