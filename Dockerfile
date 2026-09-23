@@ -20,9 +20,6 @@ ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 RUN mkdir -p /app/cache /app/tmp && chmod -R 777 /app/cache /app/tmp
 
-# Pre-download Qwen-Image-2.1 model weights directly into container image cache
-RUN python -c "import os; os.environ['HF_HOME']='/app/cache'; from diffusers import QwenImage21Pipeline; QwenImage21Pipeline.from_pretrained('Qwen/Qwen-Image-2.1', cache_dir='/app/cache')"
-
 COPY handler.py .
 
 CMD ["python", "-u", "handler.py"]
